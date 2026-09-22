@@ -106,6 +106,10 @@ import {
   resolveFlowchartTheme,
   serializeDiagramDocument,
   ARCHITECTURE_COMPONENT_SHAPES,
+  ARCHITECTURE_LABEL_FONT,
+  ARCHITECTURE_NODE_FONT_SIZE,
+  ARCHITECTURE_NODE_FONT_WEIGHT,
+  ARCHITECTURE_NODE_LINE_HEIGHT,
   ARCHITECTURE_SHAPE_RESOURCE,
   architectureEdgeVisual,
   architectureIconOffset,
@@ -114,6 +118,7 @@ import {
   resolveArchitectureSurface,
   diagramReaderFocusNode,
   FLOWCHART_EDGE_ROUTER,
+  FLOWCHART_LABEL_FONT,
   flowchartEdgeIsStraight,
   flowchartEdgePorts,
   flowchartFitsReadableViewport,
@@ -755,7 +760,18 @@ const applyDiagramSurface = (
   kind?: DiagramDocument["kind"],
 ) => {
   graph.drawBackground({ color: diagramCanvasColor(kind ?? "mind-map", theme, appearance) });
-  graph.clearGrid();
+  if (kind === "architecture" || kind === "flowchart") {
+    graph.drawGrid({
+      type: "dot",
+      args: {
+        color: appearance === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 42, 0.08)",
+        thickness: 1.2,
+      },
+    });
+    graph.showGrid();
+  } else {
+    graph.clearGrid();
+  }
 };
 
 const prepareExportSvg = (background: string) => (svg: SVGSVGElement) => {
@@ -1068,10 +1084,10 @@ const diagramNodePresentation = (
     ? compactArchitectureNodeSize(node.shape, node)
     : compactFlowchartNodeSize(node.shape);
   if (node.shape === "boundary") return { ...size, text: node.label };
-  const fontSize = 13;
-  const lineHeight = 18;
+  const fontSize = kind === "architecture" ? ARCHITECTURE_NODE_FONT_SIZE : 13;
+  const lineHeight = kind === "architecture" ? ARCHITECTURE_NODE_LINE_HEIGHT : 18;
   const text = Dom.breakText(node.label, { width: size.width - (kind === "architecture" ? 66 : 24), height: 10000 }, {
-    fontSize, 'font-size': fontSize, 'font-weight': kind === "architecture" ? 600 : !node.parentId ? 650 : 500,
+    fontSize, 'font-size': fontSize, 'font-weight': kind === "architecture" ? ARCHITECTURE_NODE_FONT_WEIGHT : !node.parentId ? 650 : 500,
     lineHeight,
   });
   return { ...size, height: Math.max(size.height, text.split("\n").length * lineHeight + 16), text };
@@ -1209,16 +1225,79 @@ const diagramEdgeLabel = (
   kind: DiagramDocument["kind"],
   appearance: DiagramAppearance = "light",
   theme?: DiagramTheme,
+  edgeKind?: DiagramEdgeKind,
 ) => {
-  const flowchart = kind === "flowchart" ? resolveFlowchartSurface(appearance, theme) : null;
-  const architecture = kind === "architecture" ? resolveArchitectureSurface(appearance) : null;
+  if (kind === "architecture") {
+    const edgePaint = edgeKind ? resolveArchitectureSurface(appearance).edges[edgeKind] : undefined;
+    return {
+      position: { distance: 0.5, offset: { x: 0, y: -14 } },
+      attrs: {
+        label: {
+          text,
+          fill: appearance === "dark" ? "#E2E8F0" : "#334155",
+          fontSize: 11,
+          fontWeight: 500,
+          fontFamily: ARCHITECTURE_LABEL_FONT,
+          lineHeight: 16,
+          textWrap: { width: 140, height: 512 },
+        },
+        body: {
+          ref: "label",
+          refWidth: 1,
+          refHeight: 1,
+          refWidth2: 14,
+          refHeight2: 6,
+          refX: -7,
+          refY: -3,
+          fill: appearance === "dark" ? "rgba(15, 23, 42, 0.92)" : "rgba(255, 255, 255, 0.96)",
+          stroke: edgePaint?.stroke ?? (appearance === "dark" ? "rgba(148, 163, 184, 0.3)" : "rgba(203, 213, 225, 0.8)"),
+          strokeWidth: 1,
+          rx: 6,
+          ry: 6,
+          style: { filter: "drop-shadow(0 1px 2px rgba(0,0,0,0.05))" },
+        },
+      },
+    };
+  }
+  if (kind === "flowchart") {
+    return {
+      position: { distance: 0.5, offset: 0 },
+      attrs: {
+        label: {
+          text,
+          fill: appearance === "dark" ? "#E2E8F0" : "#475569",
+          fontSize: 11,
+          fontWeight: 500,
+          fontFamily: FLOWCHART_LABEL_FONT,
+          lineHeight: 16,
+          textWrap: { width: 140, height: 512 },
+        },
+        body: {
+          ref: "label",
+          refWidth: 1,
+          refHeight: 1,
+          refWidth2: 14,
+          refHeight2: 6,
+          refX: -7,
+          refY: -3,
+          fill: appearance === "dark" ? "rgba(24, 28, 34, 0.94)" : "rgba(255, 255, 255, 0.95)",
+          stroke: appearance === "dark" ? "rgba(148, 163, 184, 0.28)" : "rgba(100, 116, 139, 0.24)",
+          strokeWidth: 1,
+          rx: 6,
+          ry: 6,
+          style: { filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.06))" },
+        },
+      },
+    };
+  }
+  const flowchart = null;
   return {
-    position: { distance: 0.5, offset: kind === "architecture" ? { x: 0, y: -16 } : 0 },
+    position: { distance: 0.5, offset: 0 },
     attrs: {
-      label: { text, fill: flowchart?.process.text ?? architecture?.nodes.service.text ?? palette.nodeText, fontSize: 12, lineHeight: 16, textWrap: { width: 140, height: 512 } },
+      label: { text, fill: palette.nodeText, fontSize: 12, lineHeight: 16, textWrap: { width: 140, height: 512 } },
       body: { ref: "label", refWidth: 1, refHeight: 1, refWidth2: 12, refHeight2: 8, refX: -6, refY: -4,
-        fill: flowchart?.canvas ?? architecture?.canvas ?? palette.canvas,
-        stroke: flowchart?.process.stroke ?? architecture?.nodes.service.stroke ?? palette.nodeStroke, strokeWidth: 1, rx: 4, ry: 4 },
+        fill: palette.canvas,
+        stroke: palette.nodeStroke, strokeWidth: 1, rx: 4, ry: 4 },
     },
   };
 };
@@ -1255,12 +1334,12 @@ const edgeMetadata = (
         strokeDasharray: architectureEdge?.strokeDasharray,
         sourceMarker: architectureEdge
           ? architectureEdge.sourceMarker
-          : edge.bidirectional ? { name: "block", width: 8, height: 6 } : null,
-        targetMarker: kind === "mind-map" ? null : architectureEdge?.targetMarker ?? { name: "block", width: 8, height: 6 },
+          : edge.bidirectional ? { name: "block", width: 7, height: 5 } : null,
+        targetMarker: kind === "mind-map" ? null : architectureEdge?.targetMarker ?? { name: "block", width: 7, height: 5 },
         ...(mindLine ?? { fill: "none" }),
       },
     },
-    labels: edge.label ? [diagramEdgeLabel(edge.label, palette, kind, appearance, theme)] : undefined,
+    labels: edge.label ? [diagramEdgeLabel(edge.label, palette, kind, appearance, theme, edgeKind)] : undefined,
   };
 };
 
@@ -1513,7 +1592,7 @@ const applyGraphPalette = (
       }
       if (kind !== "mind-map") edge.attr("line/fill", "none");
       if (edge.getLabels().length > 0) {
-        edge.setLabels(edge.getLabels().map((label) => diagramEdgeLabel(String(label.attrs?.label?.text ?? ""), palette, kind, appearance, theme)));
+        edge.setLabels(edge.getLabels().map((label) => diagramEdgeLabel(String(label.attrs?.label?.text ?? ""), palette, kind, appearance, theme, edgeKind)));
       }
     }
     if (kind === "mind-map") applyMindMapHierarchy(graph, theme, appearance, structure);
@@ -1796,8 +1875,15 @@ export const DiagramEditorPane = ({
       container: containerRef.current,
       autoResize: true,
       async: true,
-      background: { color: diagramCanvasColor(document.kind, documentTheme, appearance) },
-      grid: false,
+      grid: document.kind === "architecture" ? {
+        size: 20,
+        visible: true,
+        type: "dot",
+        args: {
+          color: appearance === "dark" ? "rgba(255, 255, 255, 0.12)" : "rgba(15, 23, 42, 0.08)",
+          thickness: 1.2,
+        },
+      } : false,
       panning: false,
       mousewheel: { enabled: true, modifiers: ["ctrl", "meta"], minScale: DIAGRAM_ZOOM_SCALE_MIN, maxScale: DIAGRAM_ZOOM_SCALE_MAX },
       interacting: () => !readOnly && !spacePanActiveRef.current,
@@ -2566,7 +2652,8 @@ export const DiagramEditorPane = ({
       return;
     }
     const palette = resolveDiagramPalette(themeRef.current, appearanceRef.current);
-    edge.setLabels([diagramEdgeLabel(label, palette, document?.kind ?? "flowchart", appearanceRef.current, themeRef.current)]);
+    const edgeKind = edge.getData<EdgeData>()?.kind;
+    edge.setLabels([diagramEdgeLabel(label, palette, document?.kind ?? "flowchart", appearanceRef.current, themeRef.current, edgeKind)]);
   };
 
   const createConnectedFlowNode = (shape: DiagramNodeShape) => {
